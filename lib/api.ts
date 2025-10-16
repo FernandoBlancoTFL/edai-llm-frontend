@@ -12,6 +12,15 @@ export const apiClient = {
     })
     return response
     },
+  
+    getChatHistory: async () => {
+      return fetch(`${API_BASE_URL}/api/chat/chat-history`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
+    },
 
   async getDocuments() {
     const response = await fetch(`${API_BASE_URL}/api/documents`)

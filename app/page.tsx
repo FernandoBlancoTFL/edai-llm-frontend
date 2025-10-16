@@ -24,6 +24,7 @@ interface Message {
     columns?: string[]
     url?: string
   }
+  isHistorical?: boolean // Nueva propiedad
 }
 
 interface Document {
@@ -72,9 +73,13 @@ export default function Home() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  // Load documents on mount
+  // Load documents and chat history on mount
   useEffect(() => {
-    fetchDocuments()
+    const loadInitialData = async () => {
+      await fetchDocuments()
+      await fetchChatHistory()
+    }
+    loadInitialData()
   }, [])
 
   // Mantener el input enfocado
@@ -117,6 +122,47 @@ export default function Home() {
       console.error("Error fetching documents:", error)
     } finally {
       setDocumentLoadingState('idle')
+    }
+  }
+
+  const fetchChatHistory = async () => {
+    try {
+      const response = await apiClient.getChatHistory()
+      if (response.ok) {
+        const data = await response.json()
+        
+        // Convertir el historial al formato de mensajes
+        const historyMessages: Message[] = []
+        
+        // Invertir para mostrar del más antiguo al más reciente
+        const conversations = [...data.conversations].reverse()
+        
+        conversations.forEach((conv: any) => {
+          // Agregar mensaje del usuario
+          historyMessages.push({
+            id: `user-${conv.checkpoint_id}`,
+            role: "user",
+            content: conv.query,
+            isHistorical: true, // Marcar como histórico
+          })
+
+          // Agregar respuesta del LLM
+          const metadata = conv.response_metadata
+          historyMessages.push({
+            id: `assistant-${conv.checkpoint_id}`,
+            role: "assistant",
+            content: conv.llm_response,
+            type: metadata?.type || "text",
+            data: metadata?.data,
+            isHistorical: true, // Marcar como histórico
+          })
+        })
+        
+        setMessages(historyMessages)
+      }
+    } catch (error) {
+      console.error("Error fetching chat history:", error)
+      // No mostramos toast aquí para no molestar al usuario al cargar la página
     }
   }
 

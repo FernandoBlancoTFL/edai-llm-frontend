@@ -19,6 +19,7 @@ interface Message {
     columns?: string[]
     url?: string
   }
+  isHistorical?: boolean
 }
 
 interface ChatMessageProps {
@@ -30,7 +31,7 @@ export function ChatMessage({ message, isLatest = false }: ChatMessageProps) {
   const isUser = message.role === "user"
   const [isImageModalOpen, setIsImageModalOpen] = useState(false)
 
-  const shouldAnimate = !isUser && isLatest && message.type !== "table"
+  const shouldAnimate = !isUser && isLatest && message.type !== "table" && !message.isHistorical
 
   const { displayedText, isTyping } = useTypewriter({
     text: message.content,
