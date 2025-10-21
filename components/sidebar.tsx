@@ -128,7 +128,17 @@ export function Sidebar({ documents, onFileUpload, onDeleteDocument, onClose, lo
                   <div className="flex-1 space-y-2">
                     <div className="flex items-center gap-2">
                       <FileText className="h-4 w-4 shrink-0 text-primary" />
-                      <h3 className="truncate text-sm font-medium text-sidebar-foreground">{doc.filename}</h3>
+                      <h3
+                        className="text-sm font-medium text-sidebar-foreground"
+                        style={{
+                          maxWidth: '180px',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {doc.filename}
+                      </h3>
                     </div>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                       <span>
