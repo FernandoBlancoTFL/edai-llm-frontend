@@ -123,3 +123,9 @@
     @apply bg-background text-foreground;
   }
 }
+
+@media (max-width: 1024px) {
+  .delete-btn {
+    opacity: 1 !important;
+  }
+}

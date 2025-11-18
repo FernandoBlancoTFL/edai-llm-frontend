@@ -8,9 +8,12 @@ import { Suspense } from "react"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "Análisis de Datos con LLM",
+  title: "Análisis de Datos con IA",
   description: "Conversa con tus datos de forma inteligente",
   generator: "v0.app",
+  icons: {
+    icon: "/bot.png",
+  },
 }
 
 export default function RootLayout({

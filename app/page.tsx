@@ -234,18 +234,28 @@ export default function Home() {
         })
         await fetchDocuments()
       } else {
-        const errorData = await response.json()
-        toast({
-          title: "Advertencia",
-          description: errorData.message || "Error al cargar el archivo",
-          variant: "destructive",
-        })
+        // Intentar leer el error del backend
+        try {
+          const errorData = await response.json()
+          toast({
+            title: "Error",
+            description: errorData.detail || errorData.message || "Error al cargar el archivo",
+            variant: "destructive",
+          })
+        } catch (parseError) {
+          // Si no se puede parsear el JSON, mostrar un mensaje genérico
+          toast({
+            title: "Error",
+            description: `Error al cargar el archivo (${response.status})`,
+            variant: "destructive",
+          })
+        }
       }
     } catch (error) {
       console.error("Error uploading file:", error)
       toast({
         title: "Error",
-        description: "No se pudo cargar el archivo",
+        description: "No se pudo cargar el archivo. Verifica la conexión con el backend.",
         variant: "destructive",
       })
     } finally {
@@ -309,7 +319,7 @@ export default function Home() {
             {isSidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
           <div className="flex-1">
-            <h1 className="text-xl font-semibold text-foreground">Análisis de Datos con LLM</h1>
+            <h1 className="text-xl font-semibold text-foreground">Análisis de Datos con IA</h1>
             <p className="text-sm text-muted-foreground">Conversa con tus datos de forma inteligente</p>
           </div>
           

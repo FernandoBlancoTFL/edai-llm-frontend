@@ -154,7 +154,7 @@ export function Sidebar({ documents, onFileUpload, onDeleteDocument, onClose, lo
                     variant="ghost"
                     size="icon"
                     onClick={() => handleDeleteClick(doc.file_id, doc.filename)}
-                    className="h-8 w-8 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                    className="h-8 w-8 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 delete-btn"
                     style={{ cursor: 'pointer'}}
                   >
                     <Trash2 className="h-4 w-4 text-destructive"/>
