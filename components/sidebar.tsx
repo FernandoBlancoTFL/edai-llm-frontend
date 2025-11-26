@@ -71,13 +71,8 @@ export function Sidebar({ documents, onFileUpload, onDeleteDocument, onClose, lo
   return (
     <div className="flex h-full flex-col border-r border-border bg-sidebar overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-sidebar-border px-6 py-4" style={{ height: 81}}>
+      <div className="flex items-center justify-between border-b border-sidebar-border px-6 py-4 sidebar-header" style={{ height: 81}}>
         <h2 className="text-lg font-semibold text-sidebar-foreground">Documentos</h2>
-        {onClose && (
-          <Button variant="ghost" size="icon" onClick={onClose} className="lg:hidden">
-            <X className="h-5 w-5" />
-          </Button>
-        )}
         {/* Theme Toggle Button */}
           <ThemeToggle />
       </div>

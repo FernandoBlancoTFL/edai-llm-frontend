@@ -7,7 +7,8 @@ import { User, Bot, Maximize2 } from "lucide-react"
 import Image from "next/image"
 import { ImageModal } from "@/components/image-modal"
 import { useTypewriter } from "@/hooks/use-typewriter"
-import { useEffect, useRef } from "react"
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 interface Message {
   id: string
@@ -31,12 +32,12 @@ export function ChatMessage({ message, isLatest = false }: ChatMessageProps) {
   const isUser = message.role === "user"
   const [isImageModalOpen, setIsImageModalOpen] = useState(false)
 
-  const shouldAnimate = !isUser && isLatest && message.type !== "table" && !message.isHistorical
+  const shouldAnimate = !isUser && isLatest && !message.isHistorical
 
   const { displayedText, isTyping } = useTypewriter({
     text: message.content,
-    speed: 10, // Ajusta la velocidad (más bajo = más rápido)
-    enabled: shouldAnimate //colocar false para desactivar tipeo
+    speed: 10,
+    enabled: shouldAnimate
   })
 
   const contentToShow = shouldAnimate ? displayedText : message.content
@@ -60,7 +61,7 @@ export function ChatMessage({ message, isLatest = false }: ChatMessageProps) {
           >
             {message.type === "table" && message.data?.rows && message.data?.columns ? (
               <div className="space-y-3">
-                <div className="overflow-x-auto">
+                {/* <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -83,17 +84,18 @@ export function ChatMessage({ message, isLatest = false }: ChatMessageProps) {
                       ))}
                     </TableBody>
                   </Table>
-                </div>
+                </div> */}
                 {message.content && (
-                  <p className="text-sm leading-relaxed text-balance whitespace-pre-wrap">
-                    {contentToShow}
+                  <div className="text-sm leading-relaxed markdown-content">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {contentToShow}
+                    </ReactMarkdown>
                     {isTyping && <span className="animate-pulse ml-1">▋</span>}
-                  </p>
+                  </div>
                 )}
               </div>
             ) : message.type === "plot" && message.data?.url ? (
               <div className="space-y-3">
-                {/* Contenedor clickeable con hover effect */}
                 <button
                   onClick={() => setIsImageModalOpen(true)}
                   className="group relative h-96 w-full overflow-hidden rounded-lg bg-muted border border-border transition-all hover:border-primary/50 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
@@ -108,7 +110,6 @@ export function ChatMessage({ message, isLatest = false }: ChatMessageProps) {
                     unoptimized
                   />
                   
-                  {/* Overlay con ícono de expandir */}
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
                     <div className="bg-white/90 rounded-full p-3 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
                       <Maximize2 className="h-6 w-6 text-gray-800" />
@@ -117,17 +118,21 @@ export function ChatMessage({ message, isLatest = false }: ChatMessageProps) {
                 </button>
                 
                 {message.content && (
-                  <p className="text-sm leading-relaxed text-balance whitespace-pre-wrap">
-                    {contentToShow}
+                  <div className="text-sm leading-relaxed markdown-content">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {contentToShow}
+                    </ReactMarkdown>
                     {isTyping && <span className="animate-pulse ml-1">▋</span>}
-                  </p>
+                  </div>
                 )}
               </div>
             ) : (
-              <p className="text-sm leading-relaxed text-balance whitespace-pre-wrap">
-                {contentToShow}
+              <div className="text-sm leading-relaxed markdown-content">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {contentToShow}
+                </ReactMarkdown>
                 {isTyping && <span className="animate-pulse ml-1">▋</span>}
-              </p>
+              </div>
             )}
           </Card>
         </div>
@@ -139,7 +144,6 @@ export function ChatMessage({ message, isLatest = false }: ChatMessageProps) {
         )}
       </div>
 
-      {/* Modal de imagen ampliada */}
       {message.type === "plot" && message.data?.url && (
         <ImageModal
           isOpen={isImageModalOpen}

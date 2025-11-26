@@ -197,10 +197,19 @@ export default function Home() {
     }
   } catch (error) {
     console.error("Error sending message:", error)
+    
+    const errorMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      role: "assistant",
+      content: "Lo siento, ahora no puedo responderte. Parece que hay un problema de conexión con el servidor.",
+    }
+    setMessages((prev) => [...prev, errorMessage])
+    
     toast({
-      title: "Error",
-      description: "No se pudo enviar el mensaje. Verifica la conexión con el backend.",
+      title: "Error de conexión",
+      description: "No se pudo conectar con el backend.",
       variant: "destructive",
+      className: "bg-red-500 text-white border-red-500",
     })
   } finally {
     setIsLoading(false)
@@ -231,6 +240,7 @@ export default function Home() {
         toast({
           title: "Éxito",
           description: data.message || "Archivo cargado correctamente",
+          variant: "success"
         })
         await fetchDocuments()
       } else {
@@ -271,7 +281,8 @@ export default function Home() {
       if (response.ok) {
         toast({
           title: "Éxito",
-          description: "Documento eliminado correctamente"
+          description: "Documento eliminado correctamente",
+          variant: "success"
         })
         await fetchDocuments()
       } else {
@@ -314,7 +325,7 @@ export default function Home() {
       {/* Main Chat Area */}
       <div className="flex flex-1 flex-col min-h-screen">
         {/* Header */}
-        <header className="flex items-center gap-4 border-b border-border bg-card px-6 py-4">
+        <header className="sticky top-0 z-50 flex items-center gap-4 border-b border-border bg-card px-6 py-4 shadow-md lg:static lg:shadow-none">
           <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
             {isSidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
@@ -402,7 +413,7 @@ export default function Home() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Escribe tu pregunta sobre los datos..."
+                placeholder="Escribe tu pregunta..."
                 className="flex-1 bg-background"
                 disabled={isLoading || isDocumentLoading}
               />
