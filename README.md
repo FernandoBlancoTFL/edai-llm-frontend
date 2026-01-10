@@ -5,7 +5,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5+-blue.svg)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3+-38bdf8.svg)](https://tailwindcss.com/)
 
-> **⚠️ Important Note:** This repository contains only the **frontend** of the EDAI project. For the complete system functionality, you also need to set up the **backend**, available at: [EDAI Backend Repository](https://github.com/FernandoBlancoTFL/EDALLM_langGraph)
+> **⚠️ Important Note:** This repository contains only the **frontend** of the EDAI project. For the complete system functionality, you also need to set up the **backend**, available at: [EDAI Backend Repository](https://github.com/FernandoBlancoTFL/edai-llm-backend)
 
 ---
 
