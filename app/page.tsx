@@ -24,7 +24,7 @@ interface Message {
     columns?: string[]
     url?: string
   }
-  isHistorical?: boolean // Nueva propiedad
+  isHistorical?: boolean
 }
 
 interface Document {
@@ -43,6 +43,7 @@ export default function Home() {
   const [documents, setDocuments] = useState<Document[]>([])
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [showScrollButton, setShowScrollButton] = useState(false)
+  const [isServerWarming, setIsServerWarming] = useState(false)
   const viewportRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
@@ -65,7 +66,6 @@ export default function Home() {
       const scrollHeight = document.documentElement.scrollHeight
       const clientHeight = document.documentElement.clientHeight
       
-      // Mostrar botón si no está cerca del final (más de 200px del fondo)
       setShowScrollButton(scrollHeight - scrollTop - clientHeight > 200)
     }
 
@@ -90,15 +90,12 @@ export default function Home() {
       }
     }
 
-    // Enfocar al montar el componente
     focusInput()
 
-    // Re-enfocar después de enviar un mensaje
     if (!isLoading && !isDocumentLoading) {
       focusInput()
     }
 
-    // Enfocar cuando el usuario hace click en cualquier parte (excepto elementos interactivos)
     const handleClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement
       if (!target.closest('button') && !target.closest('a') && !target.closest('input')) {
@@ -112,14 +109,26 @@ export default function Home() {
 
   const fetchDocuments = async () => {
     setDocumentLoadingState('fetching')
+    const startTime = Date.now()
+    
     try {
       const response = await apiClient.getDocuments()
+      const loadTime = Date.now() - startTime
+      
+      // Si tarda más de 5 segundos, fue un cold start
+      if (loadTime > 5000) {
+        setIsServerWarming(true)
+        // Mantener el overlay por 2 segundos más para que el usuario lo vea
+        setTimeout(() => setIsServerWarming(false), 2000)
+      }
+      
       if (response.ok) {
         const data = await response.json()
         setDocuments(data)
       }
     } catch (error) {
       console.error("Error fetching documents:", error)
+      setIsServerWarming(false)
     } finally {
       setDocumentLoadingState('idle')
     }
@@ -131,22 +140,17 @@ export default function Home() {
       if (response.ok) {
         const data = await response.json()
         
-        // Convertir el historial al formato de mensajes
         const historyMessages: Message[] = []
-        
-        // Invertir para mostrar del más antiguo al más reciente
         const conversations = [...data.conversations].reverse()
         
         conversations.forEach((conv: any) => {
-          // Agregar mensaje del usuario
           historyMessages.push({
             id: `user-${conv.checkpoint_id}`,
             role: "user",
             content: conv.query,
-            isHistorical: true, // Marcar como histórico
+            isHistorical: true,
           })
 
-          // Agregar respuesta del LLM
           const metadata = conv.response_metadata
           historyMessages.push({
             id: `assistant-${conv.checkpoint_id}`,
@@ -154,7 +158,7 @@ export default function Home() {
             content: conv.llm_response,
             type: metadata?.type || "text",
             data: metadata?.data,
-            isHistorical: true, // Marcar como histórico
+            isHistorical: true,
           })
         })
         
@@ -162,59 +166,67 @@ export default function Home() {
       }
     } catch (error) {
       console.error("Error fetching chat history:", error)
-      // No mostramos toast aquí para no molestar al usuario al cargar la página
     }
   }
 
   const handleSendMessage = async () => {
-  if (!input.trim() || isLoading || isDocumentLoading) return
+    if (!input.trim() || isLoading || isDocumentLoading) return
 
-  const userMessage: Message = {
-    id: Date.now().toString(),
-    role: "user",
-    content: input,
-  }
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      content: input,
+    }
 
-  setMessages((prev) => [...prev, userMessage])
-  setInput("")
-  setIsLoading(true)
+    setMessages((prev) => [...prev, userMessage])
+    setInput("")
+    setIsLoading(true)
 
-  try {
-    const response = await apiClient.chat(input)
+    const startTime = Date.now()
 
-    if (response.ok) {
-      const data = await response.json()
-      const assistantMessage: Message = {
+    try {
+      const response = await apiClient.chat(input)
+      const loadTime = Date.now() - startTime
+
+      // Detectar cold start en peticiones de chat
+      if (loadTime > 5000 && messages.length === 0) {
+        setIsServerWarming(true)
+        setTimeout(() => setIsServerWarming(false), 2000)
+      }
+
+      if (response.ok) {
+        const data = await response.json()
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: data.response || "",
+          type: data.type || "text",
+          data: data.data,
+        }
+        setMessages((prev) => [...prev, assistantMessage])
+      } else {
+        throw new Error("Failed to get response")
+      }
+    } catch (error) {
+      console.error("Error sending message:", error)
+      
+      const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: data.response || "",
-        type: data.type || "text",
-        data: data.data,
+        content: "Lo siento, ahora no puedo responderte. Parece que hay un problema de conexión con el servidor.",
       }
-      setMessages((prev) => [...prev, assistantMessage])
-    } else {
-      throw new Error("Failed to get response")
+      setMessages((prev) => [...prev, errorMessage])
+      
+      toast({
+        title: "Error de conexión",
+        description: "No se pudo conectar con el backend.",
+        variant: "destructive",
+        className: "bg-red-500 text-white border-red-500",
+      })
+    } finally {
+      setIsLoading(false)
     }
-  } catch (error) {
-    console.error("Error sending message:", error)
-    
-    const errorMessage: Message = {
-      id: (Date.now() + 1).toString(),
-      role: "assistant",
-      content: "Lo siento, ahora no puedo responderte. Parece que hay un problema de conexión con el servidor.",
-    }
-    setMessages((prev) => [...prev, errorMessage])
-    
-    toast({
-      title: "Error de conexión",
-      description: "No se pudo conectar con el backend.",
-      variant: "destructive",
-      className: "bg-red-500 text-white border-red-500",
-    })
-  } finally {
-    setIsLoading(false)
   }
-}
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey && !isLoading && !isDocumentLoading) {
@@ -232,8 +244,17 @@ export default function Home() {
 
   const handleFileUpload = async (file: File) => {
     setDocumentLoadingState('uploading')
+    const startTime = Date.now()
+    
     try {
       const response = await apiClient.uploadDocument(file)
+      const loadTime = Date.now() - startTime
+
+      // Detectar cold start en upload
+      if (loadTime > 5000) {
+        setIsServerWarming(true)
+        setTimeout(() => setIsServerWarming(false), 2000)
+      }
 
       if (response.ok) {
         const data = await response.json()
@@ -244,7 +265,6 @@ export default function Home() {
         })
         await fetchDocuments()
       } else {
-        // Intentar leer el error del backend
         try {
           const errorData = await response.json()
           toast({
@@ -253,7 +273,6 @@ export default function Home() {
             variant: "destructive",
           })
         } catch (parseError) {
-          // Si no se puede parsear el JSON, mostrar un mensaje genérico
           toast({
             title: "Error",
             description: `Error al cargar el archivo (${response.status})`,
@@ -302,6 +321,49 @@ export default function Home() {
 
   return (
     <div className="flex min-h-screen bg-background">
+      {/* Server Warming Overlay */}
+      {isServerWarming && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-white/80 dark:bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <Card className="p-8 shadow-2xl max-w-md mx-4 border-2">
+            <div className="flex flex-col items-center gap-6 text-center">
+              {/* Spinner animado */}
+              <div className="relative">
+                <div className="h-16 w-16 animate-spin rounded-full border-4 border-primary/30 border-t-primary" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="h-8 w-8 rounded-full bg-primary/20" />
+                </div>
+              </div>
+              
+              {/* Mensaje principal */}
+              <div className="space-y-2">
+                <h3 className="text-xl font-bold text-foreground">
+                  Iniciando servidor...
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Esto tomará aproximadamente 30 segundos
+                </p>
+                <p className="text-xs text-muted-foreground/70">
+                  Primera carga del día en plan gratuito
+                </p>
+                <p className="text-xs text-muted-foreground/70">
+                  Es posible que no se carguen las imagenes generadas. Se trata de una limitante del plan gratuito.
+                </p>
+                <p className="text-xs text-muted-foreground/70">
+                  Sin embargo, puede realizar una consulta para que genere los gráficos y pueda verlo.
+                </p>
+              </div>
+
+              {/* Barra de progreso animada */}
+              <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
+                <div className="h-full bg-primary animate-pulse" style={{
+                  animation: 'pulse 1.5s ease-in-out infinite'
+                }} />
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
       {/* Sidebar */}
       <div
         className={`${
@@ -333,7 +395,6 @@ export default function Home() {
             <h1 className="text-xl font-semibold text-foreground">Análisis de Datos con IA</h1>
             <p className="text-sm text-muted-foreground">Conversa con tus datos de forma inteligente</p>
           </div>
-          
         </header>
 
         {/* Messages Area */}
