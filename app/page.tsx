@@ -44,6 +44,7 @@ export default function Home() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [showScrollButton, setShowScrollButton] = useState(false)
   const [isServerWarming, setIsServerWarming] = useState(false)
+  const [serverWarmupAttempts, setServerWarmupAttempts] = useState(0)
   const viewportRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
@@ -110,25 +111,84 @@ export default function Home() {
   const fetchDocuments = async () => {
     setDocumentLoadingState('fetching')
     const startTime = Date.now()
+    let retryCount = 0
+    const maxRetries = 3
+    
+    const attemptFetch = async (): Promise<any> => {
+      try {
+        // Mostrar overlay si es el primer intento y está tardando
+        if (retryCount === 0) {
+          const checkTimer = setTimeout(() => {
+            setIsServerWarming(true)
+            setServerWarmupAttempts(1)
+          }, 3000) // Mostrar después de 3 segundos
+          
+          const response = await apiClient.getDocuments()
+          clearTimeout(checkTimer)
+          
+          const loadTime = Date.now() - startTime
+          
+          // Si tarda más de 5 segundos o hubo reintentos, fue un cold start
+          if (loadTime > 5000 || retryCount > 0) {
+            setIsServerWarming(true)
+            setServerWarmupAttempts(retryCount + 1)
+            setTimeout(() => {
+              setIsServerWarming(false)
+              setServerWarmupAttempts(0)
+            }, 2000)
+          } else {
+            setIsServerWarming(false)
+            setServerWarmupAttempts(0)
+          }
+          
+          if (response.ok) {
+            const data = await response.json()
+            setDocuments(data)
+            return data
+          }
+          throw new Error('Failed to fetch documents')
+        } else {
+          // Reintentos subsecuentes
+          setServerWarmupAttempts(retryCount + 1)
+          const response = await apiClient.getDocuments()
+          
+          if (response.ok) {
+            const data = await response.json()
+            setDocuments(data)
+            setIsServerWarming(true)
+            setTimeout(() => {
+              setIsServerWarming(false)
+              setServerWarmupAttempts(0)
+            }, 2000)
+            return data
+          }
+          throw new Error('Failed to fetch documents')
+        }
+      } catch (error) {
+        retryCount++
+        
+        if (retryCount <= maxRetries) {
+          // Mostrar overlay durante los reintentos
+          setIsServerWarming(true)
+          setServerWarmupAttempts(retryCount)
+          
+          // Esperar antes de reintentar (incrementando el tiempo)
+          await new Promise(resolve => setTimeout(resolve, 5000 * retryCount))
+          return attemptFetch()
+        } else {
+          // Falló después de todos los intentos
+          setIsServerWarming(false)
+          setServerWarmupAttempts(0)
+          console.error("Error fetching documents after retries:", error)
+          throw error
+        }
+      }
+    }
     
     try {
-      const response = await apiClient.getDocuments()
-      const loadTime = Date.now() - startTime
-      
-      // Si tarda más de 5 segundos, fue un cold start
-      if (loadTime > 5000) {
-        setIsServerWarming(true)
-        // Mantener el overlay por 2 segundos más para que el usuario lo vea
-        setTimeout(() => setIsServerWarming(false), 2000)
-      }
-      
-      if (response.ok) {
-        const data = await response.json()
-        setDocuments(data)
-      }
+      await attemptFetch()
     } catch (error) {
-      console.error("Error fetching documents:", error)
-      setIsServerWarming(false)
+      console.error("Final error fetching documents:", error)
     } finally {
       setDocumentLoadingState('idle')
     }
@@ -183,30 +243,88 @@ export default function Home() {
     setIsLoading(true)
 
     const startTime = Date.now()
+    let retryCount = 0
+    const maxRetries = 2
+
+    const attemptSend = async (): Promise<any> => {
+      try {
+        if (retryCount === 0) {
+          const checkTimer = setTimeout(() => {
+            setIsServerWarming(true)
+            setServerWarmupAttempts(1)
+          }, 3000)
+          
+          const response = await apiClient.chat(input)
+          clearTimeout(checkTimer)
+          
+          const loadTime = Date.now() - startTime
+
+          if (loadTime > 5000 || retryCount > 0) {
+            setIsServerWarming(true)
+            setServerWarmupAttempts(retryCount + 1)
+            setTimeout(() => {
+              setIsServerWarming(false)
+              setServerWarmupAttempts(0)
+            }, 2000)
+          } else {
+            setIsServerWarming(false)
+            setServerWarmupAttempts(0)
+          }
+
+          if (response.ok) {
+            const data = await response.json()
+            const assistantMessage: Message = {
+              id: (Date.now() + 1).toString(),
+              role: "assistant",
+              content: data.response || "",
+              type: data.type || "text",
+              data: data.data,
+            }
+            setMessages((prev) => [...prev, assistantMessage])
+            return data
+          }
+          throw new Error("Failed to get response")
+        } else {
+          setServerWarmupAttempts(retryCount + 1)
+          const response = await apiClient.chat(input)
+          
+          if (response.ok) {
+            const data = await response.json()
+            const assistantMessage: Message = {
+              id: (Date.now() + 1).toString(),
+              role: "assistant",
+              content: data.response || "",
+              type: data.type || "text",
+              data: data.data,
+            }
+            setMessages((prev) => [...prev, assistantMessage])
+            setIsServerWarming(true)
+            setTimeout(() => {
+              setIsServerWarming(false)
+              setServerWarmupAttempts(0)
+            }, 2000)
+            return data
+          }
+          throw new Error("Failed to get response")
+        }
+      } catch (error) {
+        retryCount++
+        
+        if (retryCount <= maxRetries) {
+          setIsServerWarming(true)
+          setServerWarmupAttempts(retryCount)
+          await new Promise(resolve => setTimeout(resolve, 5000 * retryCount))
+          return attemptSend()
+        } else {
+          setIsServerWarming(false)
+          setServerWarmupAttempts(0)
+          throw error
+        }
+      }
+    }
 
     try {
-      const response = await apiClient.chat(input)
-      const loadTime = Date.now() - startTime
-
-      // Detectar cold start en peticiones de chat
-      if (loadTime > 5000 && messages.length === 0) {
-        setIsServerWarming(true)
-        setTimeout(() => setIsServerWarming(false), 2000)
-      }
-
-      if (response.ok) {
-        const data = await response.json()
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: data.response || "",
-          type: data.type || "text",
-          data: data.data,
-        }
-        setMessages((prev) => [...prev, assistantMessage])
-      } else {
-        throw new Error("Failed to get response")
-      }
+      await attemptSend()
     } catch (error) {
       console.error("Error sending message:", error)
       
@@ -245,41 +363,99 @@ export default function Home() {
   const handleFileUpload = async (file: File) => {
     setDocumentLoadingState('uploading')
     const startTime = Date.now()
+    let retryCount = 0
+    const maxRetries = 2
     
-    try {
-      const response = await apiClient.uploadDocument(file)
-      const loadTime = Date.now() - startTime
+    const attemptUpload = async (): Promise<any> => {
+      try {
+        if (retryCount === 0) {
+          const checkTimer = setTimeout(() => {
+            setIsServerWarming(true)
+            setServerWarmupAttempts(1)
+          }, 3000)
+          
+          const response = await apiClient.uploadDocument(file)
+          clearTimeout(checkTimer)
+          
+          const loadTime = Date.now() - startTime
 
-      // Detectar cold start en upload
-      if (loadTime > 5000) {
-        setIsServerWarming(true)
-        setTimeout(() => setIsServerWarming(false), 2000)
-      }
+          if (loadTime > 5000 || retryCount > 0) {
+            setIsServerWarming(true)
+            setServerWarmupAttempts(retryCount + 1)
+            setTimeout(() => {
+              setIsServerWarming(false)
+              setServerWarmupAttempts(0)
+            }, 2000)
+          } else {
+            setIsServerWarming(false)
+            setServerWarmupAttempts(0)
+          }
 
-      if (response.ok) {
-        const data = await response.json()
-        toast({
-          title: "Éxito",
-          description: data.message || "Archivo cargado correctamente",
-          variant: "success"
-        })
-        await fetchDocuments()
-      } else {
-        try {
-          const errorData = await response.json()
-          toast({
-            title: "Error",
-            description: errorData.detail || errorData.message || "Error al cargar el archivo",
-            variant: "destructive",
-          })
-        } catch (parseError) {
-          toast({
-            title: "Error",
-            description: `Error al cargar el archivo (${response.status})`,
-            variant: "destructive",
-          })
+          if (response.ok) {
+            const data = await response.json()
+            toast({
+              title: "Éxito",
+              description: data.message || "Archivo cargado correctamente",
+              variant: "success"
+            })
+            await fetchDocuments()
+            return data
+          } else {
+            try {
+              const errorData = await response.json()
+              toast({
+                title: "Error",
+                description: errorData.detail || errorData.message || "Error al cargar el archivo",
+                variant: "destructive",
+              })
+            } catch (parseError) {
+              toast({
+                title: "Error",
+                description: `Error al cargar el archivo (${response.status})`,
+                variant: "destructive",
+              })
+            }
+            throw new Error('Upload failed')
+          }
+        } else {
+          setServerWarmupAttempts(retryCount + 1)
+          const response = await apiClient.uploadDocument(file)
+          
+          if (response.ok) {
+            const data = await response.json()
+            toast({
+              title: "Éxito",
+              description: data.message || "Archivo cargado correctamente",
+              variant: "success"
+            })
+            await fetchDocuments()
+            setIsServerWarming(true)
+            setTimeout(() => {
+              setIsServerWarming(false)
+              setServerWarmupAttempts(0)
+            }, 2000)
+            return data
+          }
+          throw new Error('Upload failed')
+        }
+      } catch (error) {
+        retryCount++
+        
+        if (retryCount <= maxRetries) {
+          setIsServerWarming(true)
+          setServerWarmupAttempts(retryCount)
+          await new Promise(resolve => setTimeout(resolve, 5000 * retryCount))
+          return attemptUpload()
+        } else {
+          setIsServerWarming(false)
+          setServerWarmupAttempts(0)
+          throw error
         }
       }
+    }
+
+    try {
+      await attemptUpload()
     } catch (error) {
       console.error("Error uploading file:", error)
       toast({
@@ -337,20 +513,23 @@ export default function Home() {
               {/* Mensaje principal */}
               <div className="space-y-2">
                 <h3 className="text-xl font-bold text-foreground">
-                  Iniciando servidor...
+                  {serverWarmupAttempts === 0 
+                    ? "Iniciando servidor..." 
+                    : "Conectando con servidor..."}
                 </h3>
                 <p className="text-sm text-muted-foreground">
                   Esto tomará aproximadamente 30 segundos
                 </p>
-                <p className="text-xs text-muted-foreground/70">
-                  Primera carga del día en plan gratuito
-                </p>
-                <p className="text-xs text-muted-foreground/70">
-                  Es posible que no se carguen las imagenes generadas. Se trata de una limitante del plan gratuito.
-                </p>
-                <p className="text-xs text-muted-foreground/70">
-                  Sin embargo, puede realizar una consulta para que genere los gráficos y pueda verlo.
-                </p>
+                {serverWarmupAttempts > 1 && (
+                  <p className="text-xs text-muted-foreground/70">
+                    Reintento {serverWarmupAttempts} de 3...
+                  </p>
+                )}
+                {serverWarmupAttempts <= 1 && (
+                  <p className="text-xs text-muted-foreground/70">
+                    Primera carga del día en plan gratuito
+                  </p>
+                )}
               </div>
 
               {/* Barra de progreso animada */}
