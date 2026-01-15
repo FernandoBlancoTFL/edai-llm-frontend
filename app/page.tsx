@@ -410,7 +410,7 @@ export default function Home() {
                 
                 {serverWarmupAttempts <= 1 && (
                   <p className="text-xs text-muted-foreground/70">
-                    Primera carga del día en plan gratuito
+                    No va a poder visualizar los gráficos cargados. Lo invito a generar uno nuevo.
                   </p>
                 )}
               </div>
