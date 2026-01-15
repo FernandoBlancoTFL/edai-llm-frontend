@@ -97,11 +97,22 @@ export default function Home() {
           
           if (response.ok) {
             // Servidor respondió correctamente
+            console.log('✅ Servidor activo, cargando datos...')
             setIsServerReady(true)
-            setIsServerWarming(false)
             
-            // Cargar datos iniciales
-            await loadInitialData()
+            // Cargar datos iniciales primero
+            try {
+              await loadInitialData()
+              console.log('✅ Datos cargados correctamente')
+            } catch (error) {
+              console.error('❌ Error cargando datos:', error)
+            }
+            
+            // Ocultar overlay después de cargar datos
+            setTimeout(() => {
+              setIsServerWarming(false)
+            }, 1000)
+            
             return
           }
         } catch (error) {
@@ -121,8 +132,11 @@ export default function Home() {
   }, [])
 
   const loadInitialData = async () => {
+    console.log('📊 Cargando documentos...')
     await fetchDocuments()
+    console.log('💬 Cargando historial de chat...')
     await fetchChatHistory()
+    console.log('✅ Carga completa')
   }
 
   // Mantener el input enfocado
@@ -153,33 +167,36 @@ export default function Home() {
   }, [isLoading, isDocumentLoading, messages, isServerReady])
 
   const fetchDocuments = async () => {
-    if (!isServerReady) return
-    
     setDocumentLoadingState('fetching')
     try {
+      console.log('🔍 Obteniendo documentos del servidor...')
       const response = await apiClient.getDocuments()
       
       if (response.ok) {
         const data = await response.json()
+        console.log(`✅ ${data.length} documentos cargados`)
         setDocuments(data)
+      } else {
+        console.error('❌ Error en respuesta de documentos:', response.status)
       }
     } catch (error) {
-      console.error("Error fetching documents:", error)
+      console.error("❌ Error fetching documents:", error)
     } finally {
       setDocumentLoadingState('idle')
     }
   }
 
   const fetchChatHistory = async () => {
-    if (!isServerReady) return
-    
     try {
+      console.log('💬 Obteniendo historial de chat...')
       const response = await apiClient.getChatHistory()
       if (response.ok) {
         const data = await response.json()
         
         const historyMessages: Message[] = []
         const conversations = [...data.conversations].reverse()
+        
+        console.log(`📝 ${conversations.length} conversaciones encontradas`)
         
         conversations.forEach((conv: any) => {
           historyMessages.push({
@@ -201,9 +218,12 @@ export default function Home() {
         })
         
         setMessages(historyMessages)
+        console.log(`✅ ${historyMessages.length} mensajes cargados`)
+      } else {
+        console.error('❌ Error en respuesta de historial:', response.status)
       }
     } catch (error) {
-      console.error("Error fetching chat history:", error)
+      console.error("❌ Error fetching chat history:", error)
     }
   }
 
@@ -272,7 +292,10 @@ export default function Home() {
   }
 
   const handleFileUpload = async (file: File) => {
-    if (!isServerReady) return
+    if (!isServerReady) {
+      console.warn('⚠️ Intento de subir archivo con servidor no listo')
+      return
+    }
     
     setDocumentLoadingState('uploading')
     
@@ -316,7 +339,10 @@ export default function Home() {
   }
 
   const handleDeleteDocument = async (fileId: string) => {
-    if (!isServerReady) return
+    if (!isServerReady) {
+      console.warn('⚠️ Intento de eliminar documento con servidor no listo')
+      return
+    }
     
     setDocumentLoadingState('deleting')
     try {
