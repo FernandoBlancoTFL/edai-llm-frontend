@@ -9,6 +9,13 @@
 
 ---
 
+## 🚀 Website Deployment
+
+You can see the project up and running at the following link:  
+[🔗 View Demo](https://edai-ktcn34pp4-fernandoblanco004-6824s-projects.vercel.app/)
+
+---
+
 ## 📸 Screenshots
 
 ### Generated data visualization
@@ -126,13 +133,13 @@ EDAI-Frontend/
 ### Prerequisites
 
 - Node.js 18+ and npm/pnpm
-- EDAI Backend running (see [backend repository](https://github.com/FernandoBlancoTFL/EDALLM_langGraph))
+- EDAI Backend running (see [backend repository](https://github.com/FernandoBlancoTFL/edai-llm-backend))
 
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/FernandoBlancoTFL/EDALLM_frontend.git
-cd EDALLM_frontend
+git clone https://github.com/FernandoBlancoTFL/edai-llm-frontend.git
+cd edai-llm-frontend
 ```
 
 ### 2. Install Dependencies

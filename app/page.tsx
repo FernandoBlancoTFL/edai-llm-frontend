@@ -24,7 +24,7 @@ interface Message {
     columns?: string[]
     url?: string
   }
-  isHistorical?: boolean // Nueva propiedad
+  isHistorical?: boolean
 }
 
 interface Document {
@@ -43,6 +43,9 @@ export default function Home() {
   const [documents, setDocuments] = useState<Document[]>([])
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [showScrollButton, setShowScrollButton] = useState(false)
+  const [isServerWarming, setIsServerWarming] = useState(true) // Inicia como true
+  const [serverWarmupAttempts, setServerWarmupAttempts] = useState(0)
+  const [isServerReady, setIsServerReady] = useState(false)
   const viewportRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
@@ -65,7 +68,6 @@ export default function Home() {
       const scrollHeight = document.documentElement.scrollHeight
       const clientHeight = document.documentElement.clientHeight
       
-      // Mostrar botón si no está cerca del final (más de 200px del fondo)
       setShowScrollButton(scrollHeight - scrollTop - clientHeight > 200)
     }
 
@@ -73,32 +75,86 @@ export default function Home() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  // Load documents and chat history on mount
+  // Verificación continua del servidor hasta que responda
   useEffect(() => {
-    const loadInitialData = async () => {
-      await fetchDocuments()
-      await fetchChatHistory()
+    let isMounted = true
+    let retryCount = 0
+
+    const checkServerHealth = async () => {
+      while (isMounted && !isServerReady) {
+        retryCount++
+        setServerWarmupAttempts(retryCount)
+        
+        try {
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 segundos timeout
+          
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/health`, {
+            signal: controller.signal,
+          })
+          
+          clearTimeout(timeoutId)
+          
+          if (response.ok) {
+            // Servidor respondió correctamente
+            console.log('✅ Servidor activo, cargando datos...')
+            setIsServerReady(true)
+            
+            // Cargar datos iniciales primero
+            try {
+              await loadInitialData()
+              console.log('✅ Datos cargados correctamente')
+            } catch (error) {
+              console.error('❌ Error cargando datos:', error)
+            }
+            
+            // Ocultar overlay después de cargar datos
+            setTimeout(() => {
+              setIsServerWarming(false)
+            }, 1000)
+            
+            return
+          }
+        } catch (error) {
+          console.log(`Intento ${retryCount} - Servidor no disponible, reintentando...`)
+        }
+        
+        // Esperar 10 segundos antes del próximo intento
+        await new Promise(resolve => setTimeout(resolve, 10000))
+      }
     }
-    loadInitialData()
+
+    checkServerHealth()
+
+    return () => {
+      isMounted = false
+    }
   }, [])
+
+  const loadInitialData = async () => {
+    console.log('📊 Cargando documentos...')
+    await fetchDocuments()
+    console.log('💬 Cargando historial de chat...')
+    await fetchChatHistory()
+    console.log('✅ Carga completa')
+  }
 
   // Mantener el input enfocado
   useEffect(() => {
+    if (!isServerReady) return // No enfocar si el servidor no está listo
+
     const focusInput = () => {
       if (inputRef.current && !isLoading && !isDocumentLoading) {
         inputRef.current.focus()
       }
     }
 
-    // Enfocar al montar el componente
     focusInput()
 
-    // Re-enfocar después de enviar un mensaje
     if (!isLoading && !isDocumentLoading) {
       focusInput()
     }
 
-    // Enfocar cuando el usuario hace click en cualquier parte (excepto elementos interactivos)
     const handleClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement
       if (!target.closest('button') && !target.closest('a') && !target.closest('input')) {
@@ -108,18 +164,23 @@ export default function Home() {
 
     document.addEventListener('click', handleClick)
     return () => document.removeEventListener('click', handleClick)
-  }, [isLoading, isDocumentLoading, messages])
+  }, [isLoading, isDocumentLoading, messages, isServerReady])
 
   const fetchDocuments = async () => {
     setDocumentLoadingState('fetching')
     try {
+      console.log('🔍 Obteniendo documentos del servidor...')
       const response = await apiClient.getDocuments()
+      
       if (response.ok) {
         const data = await response.json()
+        console.log(`✅ ${data.length} documentos cargados`)
         setDocuments(data)
+      } else {
+        console.error('❌ Error en respuesta de documentos:', response.status)
       }
     } catch (error) {
-      console.error("Error fetching documents:", error)
+      console.error("❌ Error fetching documents:", error)
     } finally {
       setDocumentLoadingState('idle')
     }
@@ -127,26 +188,24 @@ export default function Home() {
 
   const fetchChatHistory = async () => {
     try {
+      console.log('💬 Obteniendo historial de chat...')
       const response = await apiClient.getChatHistory()
       if (response.ok) {
         const data = await response.json()
         
-        // Convertir el historial al formato de mensajes
         const historyMessages: Message[] = []
-        
-        // Invertir para mostrar del más antiguo al más reciente
         const conversations = [...data.conversations].reverse()
         
+        console.log(`📝 ${conversations.length} conversaciones encontradas`)
+        
         conversations.forEach((conv: any) => {
-          // Agregar mensaje del usuario
           historyMessages.push({
             id: `user-${conv.checkpoint_id}`,
             role: "user",
             content: conv.query,
-            isHistorical: true, // Marcar como histórico
+            isHistorical: true,
           })
 
-          // Agregar respuesta del LLM
           const metadata = conv.response_metadata
           historyMessages.push({
             id: `assistant-${conv.checkpoint_id}`,
@@ -154,70 +213,72 @@ export default function Home() {
             content: conv.llm_response,
             type: metadata?.type || "text",
             data: metadata?.data,
-            isHistorical: true, // Marcar como histórico
+            isHistorical: true,
           })
         })
         
         setMessages(historyMessages)
+        console.log(`✅ ${historyMessages.length} mensajes cargados`)
+      } else {
+        console.error('❌ Error en respuesta de historial:', response.status)
       }
     } catch (error) {
-      console.error("Error fetching chat history:", error)
-      // No mostramos toast aquí para no molestar al usuario al cargar la página
+      console.error("❌ Error fetching chat history:", error)
     }
   }
 
   const handleSendMessage = async () => {
-  if (!input.trim() || isLoading || isDocumentLoading) return
+    if (!input.trim() || isLoading || isDocumentLoading || !isServerReady) return
 
-  const userMessage: Message = {
-    id: Date.now().toString(),
-    role: "user",
-    content: input,
-  }
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      content: input,
+    }
 
-  setMessages((prev) => [...prev, userMessage])
-  setInput("")
-  setIsLoading(true)
+    setMessages((prev) => [...prev, userMessage])
+    setInput("")
+    setIsLoading(true)
 
-  try {
-    const response = await apiClient.chat(input)
+    try {
+      const response = await apiClient.chat(input)
 
-    if (response.ok) {
-      const data = await response.json()
-      const assistantMessage: Message = {
+      if (response.ok) {
+        const data = await response.json()
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: data.response || "",
+          type: data.type || "text",
+          data: data.data,
+        }
+        setMessages((prev) => [...prev, assistantMessage])
+      } else {
+        throw new Error("Failed to get response")
+      }
+    } catch (error) {
+      console.error("Error sending message:", error)
+      
+      const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: data.response || "",
-        type: data.type || "text",
-        data: data.data,
+        content: "Lo siento, ahora no puedo responderte. Parece que hay un problema de conexión con el servidor.",
       }
-      setMessages((prev) => [...prev, assistantMessage])
-    } else {
-      throw new Error("Failed to get response")
+      setMessages((prev) => [...prev, errorMessage])
+      
+      toast({
+        title: "Error de conexión",
+        description: "No se pudo conectar con el backend.",
+        variant: "destructive",
+        className: "bg-red-500 text-white border-red-500",
+      })
+    } finally {
+      setIsLoading(false)
     }
-  } catch (error) {
-    console.error("Error sending message:", error)
-    
-    const errorMessage: Message = {
-      id: (Date.now() + 1).toString(),
-      role: "assistant",
-      content: "Lo siento, ahora no puedo responderte. Parece que hay un problema de conexión con el servidor.",
-    }
-    setMessages((prev) => [...prev, errorMessage])
-    
-    toast({
-      title: "Error de conexión",
-      description: "No se pudo conectar con el backend.",
-      variant: "destructive",
-      className: "bg-red-500 text-white border-red-500",
-    })
-  } finally {
-    setIsLoading(false)
   }
-}
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey && !isLoading && !isDocumentLoading) {
+    if (e.key === "Enter" && !e.shiftKey && !isLoading && !isDocumentLoading && isServerReady) {
       e.preventDefault()
       handleSendMessage()
     }
@@ -231,7 +292,13 @@ export default function Home() {
   }
 
   const handleFileUpload = async (file: File) => {
+    if (!isServerReady) {
+      console.warn('⚠️ Intento de subir archivo con servidor no listo')
+      return
+    }
+    
     setDocumentLoadingState('uploading')
+    
     try {
       const response = await apiClient.uploadDocument(file)
 
@@ -244,7 +311,6 @@ export default function Home() {
         })
         await fetchDocuments()
       } else {
-        // Intentar leer el error del backend
         try {
           const errorData = await response.json()
           toast({
@@ -253,7 +319,6 @@ export default function Home() {
             variant: "destructive",
           })
         } catch (parseError) {
-          // Si no se puede parsear el JSON, mostrar un mensaje genérico
           toast({
             title: "Error",
             description: `Error al cargar el archivo (${response.status})`,
@@ -274,6 +339,11 @@ export default function Home() {
   }
 
   const handleDeleteDocument = async (fileId: string) => {
+    if (!isServerReady) {
+      console.warn('⚠️ Intento de eliminar documento con servidor no listo')
+      return
+    }
+    
     setDocumentLoadingState('deleting')
     try {
       const response = await apiClient.deleteDocument(fileId)
@@ -302,136 +372,218 @@ export default function Home() {
 
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Sidebar */}
-      <div
-        className={`${
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } fixed inset-y-0 left-0 z-50 w-80 transition-transform duration-300 ease-in-out lg:sticky lg:top-0 lg:h-screen lg:translate-x-0`}
-      >
-        <Sidebar
-          documents={documents}
-          onFileUpload={handleFileUpload}
-          onDeleteDocument={handleDeleteDocument}
-          onClose={() => setIsSidebarOpen(false)}
-          loadingState={documentLoadingState}
-        />
-      </div>
+      {/* Server Warming Overlay - Bloquea toda la aplicación */}
+      {isServerWarming && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-white/95 dark:bg-black/95 backdrop-blur-md">
+          <Card className="p-8 shadow-2xl max-w-md mx-4 border-2">
+            <div className="flex flex-col items-center gap-6 text-center">
+              {/* Spinner animado */}
+              <div className="relative">
+                <div className="h-16 w-16 animate-spin rounded-full border-4 border-primary/30 border-t-primary" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="h-8 w-8 rounded-full bg-primary/20 animate-pulse" />
+                </div>
+              </div>
+              
+              {/* Mensaje principal */}
+              <div className="space-y-3">
+                <h3 className="text-xl font-bold text-foreground">
+                  {serverWarmupAttempts === 0 || serverWarmupAttempts === 1
+                    ? "Iniciando servidor..." 
+                    : "Esperando respuesta del servidor..."}
+                </h3>
+                
+                <p className="text-sm text-muted-foreground">
+                  Esto puede tomar hasta 30-40 segundos
+                </p>
+                
+                {serverWarmupAttempts > 1 && (
+                  <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+                    <p className="text-xs text-muted-foreground">
+                      Intento {serverWarmupAttempts}
+                    </p>
+                    <p className="text-xs text-muted-foreground/70 mt-1">
+                      Reintentando cada 10 segundos...
+                    </p>
+                  </div>
+                )}
+                
+                {serverWarmupAttempts <= 1 && (
+                  <p className="text-xs text-muted-foreground/70">
+                    No va a poder visualizar los gráficos cargados. Lo invito a generar uno nuevo.
+                  </p>
+                )}
+              </div>
 
-      {/* Overlay for mobile */}
-      {isSidebarOpen && (
-        <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setIsSidebarOpen(false)} />
+              {/* Barra de progreso animada */}
+              <div className="w-full space-y-2">
+                <div className="h-1 bg-muted rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-primary transition-all duration-1000 ease-in-out"
+                    style={{
+                      width: '100%',
+                      animation: 'slide 2s ease-in-out infinite'
+                    }}
+                  />
+                </div>
+                <p className="text-xs text-center text-muted-foreground/60">
+                  Por favor, no cierres esta ventana
+                </p>
+              </div>
+            </div>
+          </Card>
+        </div>
       )}
 
-      {/* Main Chat Area */}
-      <div className="flex flex-1 flex-col min-h-screen">
-        {/* Header */}
-        <header className="sticky top-0 z-50 flex items-center gap-4 border-b border-border bg-card px-6 py-4 shadow-md lg:static lg:shadow-none">
-          <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
-            {isSidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-xl font-semibold text-foreground">Análisis de Datos con IA</h1>
-            <p className="text-sm text-muted-foreground">Conversa con tus datos de forma inteligente</p>
+      {/* Resto de la aplicación - Solo visible cuando el servidor está listo */}
+      {isServerReady && (
+        <>
+          {/* Sidebar */}
+          <div
+            className={`${
+              isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+            } fixed inset-y-0 left-0 z-50 w-80 transition-transform duration-300 ease-in-out lg:sticky lg:top-0 lg:h-screen lg:translate-x-0`}
+          >
+            <Sidebar
+              documents={documents}
+              onFileUpload={handleFileUpload}
+              onDeleteDocument={handleDeleteDocument}
+              onClose={() => setIsSidebarOpen(false)}
+              loadingState={documentLoadingState}
+            />
           </div>
-          
-        </header>
 
-        {/* Messages Area */}
-        <ScrollArea className="flex-1 px-4 py-6">
-          <div ref={viewportRef}>
-            <div className="mx-auto max-w-4xl space-y-6">
-              {messages.length === 0 ? (
-                <div className="flex h-full items-center justify-center">
-                  <Card className="border-2 border-dashed border-border bg-muted/30 p-12 text-center">
-                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-                      <svg className="h-8 w-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
-                        />
-                      </svg>
-                    </div>
-                    <h3 className="mb-2 text-lg font-semibold text-foreground">Comienza una conversación</h3>
-                    <p className="text-sm text-muted-foreground">Sube un documento y pregunta sobre tus datos</p>
-                  </Card>
-                </div>
-              ) : (
-                messages.map((message, index) => (
-                  <ChatMessage 
-                    key={message.id} 
-                    message={message} 
-                    isLatest={index === messages.length - 1}
-                  />
-                ))
-              )}
-              {isLoading && (
-                <div className="flex items-center gap-3 text-muted-foreground">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                  </div>
-                  <span className="text-sm">Pensando...</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </ScrollArea>
+          {/* Overlay for mobile */}
+          {isSidebarOpen && (
+            <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setIsSidebarOpen(false)} />
+          )}
 
-        {/* Scroll to Bottom Button */}
-        {showScrollButton && (
-          <div className="fixed bottom-20 left-3/5 -translate-x-1/2 z-30 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <Button
-              onClick={scrollToBottom}
-              size="icon"
-              className="h-12 w-12 rounded-full shadow-lg hover:shadow-xl transition-shadow"
-              style={{ cursor: 'pointer'}}
-            >
-              <svg 
-                className="h-5 w-5" 
-                fill="none" 
-                viewBox="0 0 24 24" 
-                stroke="currentColor"
-              >
-                <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  strokeWidth={2} 
-                  d="M19 14l-7 7m0 0l-7-7m7 7V3" 
-                />
-              </svg>
-            </Button>
-          </div>
-        )}
-
-        {/* Input Area */}
-        <div className="sticky bottom-0 border-t border-border bg-card px-4 py-4 z-20 shadow-lg">
-          <div className="mx-auto max-w-4xl">
-            <div className="flex gap-3">
-              <Input
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Escribe tu pregunta..."
-                className="flex-1 bg-background"
-                disabled={isLoading || isDocumentLoading}
-              />
-              <Button
-                onClick={handleSendMessage}
-                disabled={isLoading || isDocumentLoading || !input.trim()}
-                size="icon"
-                className="shrink-0"
-                style={{ cursor: 'pointer'}}
-              >
-                <Send className="h-4 w-4" />
+          {/* Main Chat Area */}
+          <div className="flex flex-1 flex-col min-h-screen">
+            {/* Header */}
+            <header className="sticky top-0 z-50 flex items-center gap-4 border-b border-border bg-card px-6 py-4 shadow-md lg:static lg:shadow-none">
+              <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
+                {isSidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </Button>
+              <div className="flex-1">
+                <h1 className="text-xl font-semibold text-foreground">Análisis de Datos con IA</h1>
+                <p className="text-sm text-muted-foreground">Conversa con tus datos de forma inteligente</p>
+              </div>
+            </header>
+
+            {/* Messages Area */}
+            <ScrollArea className="flex-1 px-4 py-6">
+              <div ref={viewportRef}>
+                <div className="mx-auto max-w-4xl space-y-6">
+                  {messages.length === 0 ? (
+                    <div className="flex h-full items-center justify-center">
+                      <Card className="border-2 border-dashed border-border bg-muted/30 p-12 text-center">
+                        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                          <svg className="h-8 w-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
+                            />
+                          </svg>
+                        </div>
+                        <h3 className="mb-2 text-lg font-semibold text-foreground">Comienza una conversación</h3>
+                        <p className="text-sm text-muted-foreground">Sube un documento y pregunta sobre tus datos</p>
+                      </Card>
+                    </div>
+                  ) : (
+                    messages.map((message, index) => (
+                      <ChatMessage 
+                        key={message.id} 
+                        message={message} 
+                        isLatest={index === messages.length - 1}
+                      />
+                    ))
+                  )}
+                  {isLoading && (
+                    <div className="flex items-center gap-3 text-muted-foreground">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                      </div>
+                      <span className="text-sm">Pensando...</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </ScrollArea>
+
+            {/* Scroll to Bottom Button */}
+            {showScrollButton && (
+              <div className="fixed bottom-20 left-3/5 -translate-x-1/2 z-30 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <Button
+                  onClick={scrollToBottom}
+                  size="icon"
+                  className="h-12 w-12 rounded-full shadow-lg hover:shadow-xl transition-shadow"
+                  style={{ cursor: 'pointer'}}
+                >
+                  <svg 
+                    className="h-5 w-5" 
+                    fill="none" 
+                    viewBox="0 0 24 24" 
+                    stroke="currentColor"
+                  >
+                    <path 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round" 
+                      strokeWidth={2} 
+                      d="M19 14l-7 7m0 0l-7-7m7 7V3" 
+                    />
+                  </svg>
+                </Button>
+              </div>
+            )}
+
+            {/* Input Area */}
+            <div className="sticky bottom-0 border-t border-border bg-card px-4 py-4 z-20 shadow-lg">
+              <div className="mx-auto max-w-4xl">
+                <div className="flex gap-3">
+                  <Input
+                    ref={inputRef}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="Escribe tu pregunta..."
+                    className="flex-1 bg-background"
+                    disabled={isLoading || isDocumentLoading}
+                  />
+                  <Button
+                    onClick={handleSendMessage}
+                    disabled={isLoading || isDocumentLoading || !input.trim()}
+                    size="icon"
+                    className="shrink-0"
+                    style={{ cursor: 'pointer'}}
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+        </>
+      )}
 
       <Toaster />
+      
+      {/* CSS para la animación de la barra */}
+      <style jsx global>{`
+        @keyframes slide {
+          0% {
+            transform: translateX(-100%);
+          }
+          50% {
+            transform: translateX(100%);
+          }
+          100% {
+            transform: translateX(-100%);
+          }
+        }
+      `}</style>
     </div>
   )
 }
