@@ -61,30 +61,6 @@ export function ChatMessage({ message, isLatest = false }: ChatMessageProps) {
           >
             {message.type === "table" && message.data?.rows && message.data?.columns ? (
               <div className="space-y-3">
-                {/* <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        {message.data.columns.map((column, index) => (
-                          <TableHead key={index} className="whitespace-nowrap font-semibold">
-                            {column}
-                          </TableHead>
-                        ))}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {message.data.rows.map((row, rowIndex) => (
-                        <TableRow key={rowIndex}>
-                          {message.data.columns?.map((column, colIndex) => (
-                            <TableCell key={colIndex} className="whitespace-nowrap">
-                              {row[column]}
-                            </TableCell>
-                          ))}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div> */}
                 {message.content && (
                   <div className="text-sm leading-relaxed markdown-content">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
