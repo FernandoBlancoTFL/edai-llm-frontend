@@ -13,6 +13,7 @@ import { Send, Menu, X } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 import { apiClient } from "@/lib/api"
+import { ChatSuggestions } from "@/components/chat-suggestions"
 
 interface Message {
   id: string
@@ -536,7 +537,7 @@ export default function Home() {
               onDeleteDocument={handleDeleteDocument}
               onClose={() => setIsSidebarOpen(false)}
               loadingState={documentLoadingState}
-            />
+            />git merge feat/export-chat-history-json
           </div>
 
           {/* Overlay for mobile */}
@@ -584,8 +585,18 @@ export default function Home() {
                             />
                           </svg>
                         </div>
-                        <h3 className="mb-2 text-lg font-semibold text-foreground">Comienza una conversación</h3>
-                        <p className="text-sm text-muted-foreground">Sube un documento y pregunta sobre tus datos</p>
+                        <h3 className="mb-2 text-lg font-semibold text-foreground">
+                          Comienza una conversación
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          Sube un documento y pregunta sobre tus datos
+                        </p>
+                        <div className="mb-3 flex flex-wrap gap-2">
+                          <ChatSuggestions onSelectSuggestion={(text) => {
+                            setInput(text)
+                            inputRef.current?.focus()
+                          }} />
+                        </div>
                       </Card>
                     </div>
                   ) : (

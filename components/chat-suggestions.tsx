@@ -4,11 +4,11 @@ interface ChatSuggestionsProps {
 
 export function ChatSuggestions({ onSelectSuggestion }: ChatSuggestionsProps) {
   const suggestions = [
-    "¿Cuántas filas tiene el dataset?",
-    "Mostrá un resumen estadístico",
-    "Generá un histograma",
-    "¿Qué columnas tiene el dataset?",
-    "Ayuda"
+    "Hola",
+    "Ayuda",
+    "¿Cuántas filas tiene el dataset de cocodrlos?",
+    "Mostrá un resumen estadístico del primer dataset",
+    "¿Qué columnas tiene el dataset de cocodrilo?"
   ]
 
   return (
