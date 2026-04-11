@@ -370,6 +370,92 @@ export default function Home() {
     }
   }
 
+  const transformChatHistory = (data: any) => {
+    const conversations = data.conversations || []
+
+    const total = conversations.length
+    const successful = conversations.filter((c: any) => c.success).length
+
+    const typeCount: Record<string, number> = {}
+
+    conversations.forEach((c: any) => {
+      const type = c.response_metadata?.type || "text"
+      typeCount[type] = (typeCount[type] || 0) + 1
+    })
+
+    const mostFrequentType =
+      Object.entries(typeCount).sort((a, b) => b[1] - a[1])[0]?.[0] || "unknown"
+
+    return {
+      thread_id: data.thread_id,
+      exported_at: new Date().toISOString(),
+      total_conversations: total,
+      summary: {
+        total_queries: total,
+        successful_queries: successful,
+        most_frequent_type: mostFrequentType,
+      },
+      conversations: conversations.map((conv: any) => ({
+        timestamp: conv.timestamp,
+        query: conv.query,
+        response: conv.llm_response,
+        type: conv.response_metadata?.type || "text",
+        success: conv.success,
+        chart: conv.response_metadata?.data
+          ? {
+              url: conv.response_metadata.data.url,
+              filename: conv.response_metadata.data.filename,
+            }
+          : null,
+      })),
+    }
+  }
+
+  const downloadJSON = (data: any) => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    })
+
+    const url = URL.createObjectURL(blob)
+
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `chat_history_${new Date().toISOString()}.json`
+    link.click()
+
+    URL.revokeObjectURL(url)
+  }
+
+  const handleExportHistory = async () => {
+    try {
+      const response = await apiClient.getChatHistory()
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch history")
+      }
+
+      const data = await response.json()
+
+      const transformed = transformChatHistory(data)
+
+      downloadJSON(transformed)
+
+      toast({
+        title: "Exportación exitosa",
+        description: "El historial se descargó correctamente",
+        variant: "success",
+      })
+    } catch (error) {
+      console.error(error)
+
+      toast({
+        title: "Error",
+        description: "No se pudo exportar el historial",
+        variant: "destructive",
+      })
+    }
+  }
+
   return (
     <div className="flex min-h-screen bg-background">
       {/* Server Warming Overlay - Bloquea toda la aplicación */}
@@ -468,6 +554,16 @@ export default function Home() {
               <div className="flex-1">
                 <h1 className="text-xl font-semibold text-foreground">Análisis de Datos con IA</h1>
                 <p className="text-sm text-muted-foreground">Conversa con tus datos de forma inteligente</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handleExportHistory}
+                  disabled={!isServerReady}
+                  className="cursor-pointer disabled:cursor-not-allowed"
+                >
+                  Exportar JSON
+                </Button>
               </div>
             </header>
 
