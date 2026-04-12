@@ -9,6 +9,7 @@ import { ImageModal } from "@/components/image-modal"
 import { useTypewriter } from "@/hooks/use-typewriter"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { Copy, Check } from "lucide-react"
 
 interface Message {
   id: string
@@ -33,6 +34,7 @@ export function ChatMessage({ message, isLatest = false }: ChatMessageProps) {
   const isUser = message.role === "user"
   const [isImageModalOpen, setIsImageModalOpen] = useState(false)
   const [highlightTime, setHighlightTime] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const shouldAnimate = !isUser && isLatest && !message.isHistorical
 
@@ -60,6 +62,19 @@ export function ChatMessage({ message, isLatest = false }: ChatMessageProps) {
     return `${(ms / 1000).toFixed(2)} s`
   }
 
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(message.content) // 👈 Markdown original
+      setCopied(true)
+
+      setTimeout(() => {
+        setCopied(false)
+      }, 1500)
+    } catch (err) {
+      console.error("Error copying text:", err)
+    }
+  }
+
   const contentToShow = shouldAnimate ? displayedText : message.content
 
   return (
@@ -73,12 +88,28 @@ export function ChatMessage({ message, isLatest = false }: ChatMessageProps) {
 
         <div className={`flex max-w-[80%] min-w-0 flex-col gap-2 ${isUser ? "items-end" : "items-start"}`}>
           <Card
-            className={`relative px-4 py-3 ${
+            className={`relative px-4 ${
+              isUser ? "py-3" : "pt-10 pb-3"
+            } ${
               isUser 
                 ? "bg-primary text-primary-foreground" 
                 : "bg-card text-card-foreground border-border max-w-full overflow-x-auto"
             }`}
           >
+            {!isUser && (
+              <button
+                onClick={handleCopy}
+                className="absolute top-2 right-2 p-1 rounded-md hover:bg-muted transition"
+                style={{ cursor: "pointer" }}
+                title="Copiar respuesta"
+              >
+                {copied ? (
+                  <Check className="h-4 w-4 text-green-500" />
+                ) : (
+                  <Copy className="h-4 w-4 text-muted-foreground" />
+                )}
+              </button>
+            )}
             {message.type === "table" && message.data?.rows && message.data?.columns ? (
               <div className="space-y-3">
                 {message.content && (
