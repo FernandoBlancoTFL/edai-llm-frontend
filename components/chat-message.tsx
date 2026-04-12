@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { User, Bot, Maximize2 } from "lucide-react"
@@ -21,6 +21,7 @@ interface Message {
     url?: string
   }
   isHistorical?: boolean
+  responseTime?: number
 }
 
 interface ChatMessageProps {
@@ -31,6 +32,7 @@ interface ChatMessageProps {
 export function ChatMessage({ message, isLatest = false }: ChatMessageProps) {
   const isUser = message.role === "user"
   const [isImageModalOpen, setIsImageModalOpen] = useState(false)
+  const [highlightTime, setHighlightTime] = useState(false)
 
   const shouldAnimate = !isUser && isLatest && !message.isHistorical
 
@@ -39,6 +41,24 @@ export function ChatMessage({ message, isLatest = false }: ChatMessageProps) {
     speed: 10,
     enabled: shouldAnimate
   })
+
+  useEffect(() => {
+    if (!isUser && message.responseTime) {
+      setHighlightTime(true)
+
+      const timeout = setTimeout(() => {
+        setHighlightTime(false)
+      }, 2000) // ajustar
+
+      return () => clearTimeout(timeout)
+    }
+  }, [message.responseTime])
+
+  function formatResponseTime(ms?: number) {
+    if (!ms) return null
+    if (ms < 1000) return `${ms} ms`
+    return `${(ms / 1000).toFixed(2)} s`
+  }
 
   const contentToShow = shouldAnimate ? displayedText : message.content
 
@@ -53,7 +73,7 @@ export function ChatMessage({ message, isLatest = false }: ChatMessageProps) {
 
         <div className={`flex max-w-[80%] min-w-0 flex-col gap-2 ${isUser ? "items-end" : "items-start"}`}>
           <Card
-            className={`px-4 py-3 ${
+            className={`relative px-4 py-3 ${
               isUser 
                 ? "bg-primary text-primary-foreground" 
                 : "bg-card text-card-foreground border-border max-w-full overflow-x-auto"
@@ -103,11 +123,20 @@ export function ChatMessage({ message, isLatest = false }: ChatMessageProps) {
                 )}
               </div>
             ) : (
-              <div className="text-sm leading-relaxed markdown-content">
+              <div className="text-sm leading-relaxed markdown-content mb-2">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {contentToShow}
                 </ReactMarkdown>
                 {isTyping && <span className="animate-pulse ml-1">▋</span>}
+              </div>
+            )}
+            {!isUser && message.responseTime && (
+              <div
+                className={`absolute bottom-2 right-3 text-[12px] transition-colors duration-500 ${
+                  highlightTime ? "text-green-500" : "text-muted-foreground"
+                }`}
+              >
+                {formatResponseTime(message.responseTime)}
               </div>
             )}
           </Card>

@@ -26,6 +26,7 @@ interface Message {
     url?: string
   }
   isHistorical?: boolean
+  responseTime?: number
 }
 
 interface Document {
@@ -231,6 +232,8 @@ export default function Home() {
   const handleSendMessage = async () => {
     if (!input.trim() || isLoading || isDocumentLoading || !isServerReady) return
 
+    const startTime = Date.now()
+
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
@@ -246,12 +249,17 @@ export default function Home() {
 
       if (response.ok) {
         const data = await response.json()
+
+        const endTime = Date.now()
+        const duration = endTime - startTime
+
         const assistantMessage: Message = {
           id: (Date.now() + 1).toString(),
           role: "assistant",
           content: data.response || "",
           type: data.type || "text",
           data: data.data,
+          responseTime: duration
         }
         setMessages((prev) => [...prev, assistantMessage])
       } else {
@@ -537,7 +545,7 @@ export default function Home() {
               onDeleteDocument={handleDeleteDocument}
               onClose={() => setIsSidebarOpen(false)}
               loadingState={documentLoadingState}
-            />git merge feat/export-chat-history-json
+            />
           </div>
 
           {/* Overlay for mobile */}
