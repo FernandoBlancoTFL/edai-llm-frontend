@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 import { apiClient } from "@/lib/api"
 import { ChatSuggestions } from "@/components/chat-suggestions"
+import { jsPDF } from "jspdf"
 
 interface Message {
   id: string
@@ -445,6 +446,8 @@ export default function Home() {
 
       const data = await response.json()
 
+      console.log(data)
+
       const transformed = transformChatHistory(data)
 
       downloadJSON(transformed)
@@ -463,6 +466,94 @@ export default function Home() {
         variant: "destructive",
       })
     }
+  }
+
+  const groupByDataset = (conversations) => {
+    const groups = {}
+
+    conversations.forEach((conv) => {
+      const key = conv.dataset || "general"
+
+      if (!groups[key]) {
+        groups[key] = []
+      }
+
+      groups[key].push(conv)
+    })
+
+    return groups
+  }
+
+  const handleExportPDF = async () => {
+    try {
+      const response = await apiClient.getChatHistory()
+
+      if (!response.ok) throw new Error("Failed")
+
+      const data = await response.json()
+      const conversations = data.conversations
+
+      const grouped = groupByDataset(conversations)
+
+      const pdf = new jsPDF()
+
+      let y = 10
+
+      for (const dataset in grouped) {
+        // 🔹 Título de sección
+        pdf.setFontSize(16)
+        pdf.text(`Dataset: ${dataset}`, 10, y)
+        y += 10
+
+        for (const conv of grouped[dataset]) {
+          // 🔸 Query
+          pdf.setFontSize(12)
+          pdf.text(`Consulta: ${conv.query}`, 10, y)
+          y += 8
+
+          // 🔸 Respuesta
+          const splitText = pdf.splitTextToSize(conv.llm_response, 180)
+          pdf.text(splitText, 10, y)
+          y += splitText.length * 6
+
+          // 🔸 Imagen (si existe)
+          if (conv.response_metadata?.data?.url) {
+            const imgUrl = conv.response_metadata.data.url + "?t=" + Date.now()
+
+            const imgData = await loadImageAsBase64(imgUrl)
+
+            pdf.addImage(imgData, "PNG", 10, y, 180, 80)
+            y += 90
+          }
+
+          y += 10
+
+          // Salto de página si se llena
+          if (y > 270) {
+            pdf.addPage()
+            y = 10
+          }
+        }
+
+        y += 10
+      }
+
+      pdf.save("chat-history.pdf")
+
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const loadImageAsBase64 = async (url) => {
+    const res = await fetch(url)
+    const blob = await res.blob()
+
+    return new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(reader.result)
+      reader.readAsDataURL(blob)
+    })
   }
 
   return (
@@ -572,6 +663,14 @@ export default function Home() {
                   className="cursor-pointer disabled:cursor-not-allowed"
                 >
                   Exportar JSON
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleExportPDF}
+                  disabled={!isServerReady}
+                  className="cursor-pointer disabled:cursor-not-allowed"
+                >
+                  Exportar PDF
                 </Button>
               </div>
             </header>
