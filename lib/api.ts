@@ -27,6 +27,14 @@ export const apiClient = {
     return response
   },
 
+  async getDocumentPreview(fileId: string) {
+    const response = await fetch(
+      `${API_BASE_URL}/api/documents/${fileId}/preview`
+    )
+
+    return response
+  },
+
   async uploadDocument(file: File) {
     const formData = new FormData()
     formData.append("file", file)

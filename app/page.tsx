@@ -178,6 +178,7 @@ export default function Home() {
       if (response.ok) {
         const data = await response.json()
         console.log(`✅ ${data.length} documentos cargados`)
+        console.log(data)
         setDocuments(data)
       } else {
         console.error('❌ Error en respuesta de documentos:', response.status)
@@ -445,9 +446,6 @@ export default function Home() {
       }
 
       const data = await response.json()
-
-      //console.log(data)
-
       const transformed = transformChatHistory(data)
 
       downloadJSON(transformed)
