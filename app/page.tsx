@@ -446,7 +446,7 @@ export default function Home() {
 
       const data = await response.json()
 
-      console.log(data)
+      //console.log(data)
 
       const transformed = transformChatHistory(data)
 
@@ -484,6 +484,14 @@ export default function Home() {
     return groups
   }
 
+  const removeMarkdown = (text) => {
+    return text
+      .replace(/\*\*(.*?)\*\*/g, "$1") // **texto**
+      .replace(/\*(.*?)\*/g, "$1")     // *texto*
+      .replace(/#+\s/g, "")            // # títulos
+      .replace(/`(.*?)`/g, "$1")       // código
+  }
+
   const handleExportPDF = async () => {
     try {
       const response = await apiClient.getChatHistory()
@@ -506,15 +514,37 @@ export default function Home() {
         y += 10
 
         for (const conv of grouped[dataset]) {
+          pdf.line(10, y, 200, y)
+          y += 8
           // 🔸 Query
           pdf.setFontSize(12)
-          pdf.text(`Consulta: ${conv.query}`, 10, y)
-          y += 8
+          pdf.setFont("helvetica", "bold")
+          pdf.text("Consulta:", 10, y)
+
+          pdf.setFont("helvetica", "normal")
+
+          const splitQuery = pdf.splitTextToSize(conv.query, 180)
+
+          pdf.text(splitQuery, 10, y + 6)
+
+          y += (splitQuery.length * 6) + 10
 
           // 🔸 Respuesta
-          const splitText = pdf.splitTextToSize(conv.llm_response, 180)
+          pdf.setFont("helvetica", "bold")
+          pdf.text("Respuesta del modelo de IA:", 10, y)
+
+          y += 6
+
+          pdf.setFont("helvetica", "normal")
+          const cleanText = removeMarkdown(conv.llm_response)
+
+          const splitText = pdf.splitTextToSize(cleanText, 180)
           pdf.text(splitText, 10, y)
-          y += splitText.length * 6
+
+          //spacing
+          const lineHeight = 5
+          pdf.text(splitText, 10, y)
+          y += splitText.length * lineHeight
 
           // 🔸 Imagen (si existe)
           if (conv.response_metadata?.data?.url) {
