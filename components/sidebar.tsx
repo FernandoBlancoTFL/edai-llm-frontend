@@ -1,14 +1,14 @@
 "use client"
 
 import type React from "react"
-
-import { useRef } from "react"
+import { useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Upload, FileText, Trash2, X } from "lucide-react"
+import { Upload, FileText, Trash2, X, Eye } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import Swal from 'sweetalert2'
+import DocumentPreviewModal from "./DocumentPreviewModal"
 
 interface Document {
   file_id: string
@@ -28,6 +28,8 @@ interface SidebarProps {
 
 export function Sidebar({ documents, onFileUpload, onDeleteDocument, onClose, loadingState = 'idle' }: SidebarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [selectedFileId, setSelectedFileId] = useState<string | null>(null)
+  const [previewOpen, setPreviewOpen] = useState(false)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -66,6 +68,11 @@ export function Sidebar({ documents, onFileUpload, onDeleteDocument, onClose, lo
     if (result.isConfirmed) {
       onDeleteDocument(fileId)
     }
+  }
+
+  const handlePreviewClick = (fileId: string) => {
+    setSelectedFileId(fileId)
+    setPreviewOpen(true)
   }
 
   return (
@@ -145,21 +152,36 @@ export function Sidebar({ documents, onFileUpload, onDeleteDocument, onClose, lo
                     </div>
                     <p className="text-xs text-muted-foreground">{formatDate(doc.created_at)}</p>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDeleteClick(doc.file_id, doc.filename)}
-                    className="h-8 w-8 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 delete-btn"
-                    style={{ cursor: 'pointer'}}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive"/>
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handlePreviewClick(doc.file_id)}
+                      className="h-8 w-8 shrink-0"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteClick(doc.file_id, doc.filename)}
+                      className="h-8 w-8 shrink-0"
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
                 </div>
               </Card>
             ))
           )}
         </div>
       </ScrollArea>
+      <DocumentPreviewModal
+        fileId={selectedFileId}
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+      />
     </div>
   )
 }
