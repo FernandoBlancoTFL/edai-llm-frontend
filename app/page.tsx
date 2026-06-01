@@ -53,6 +53,11 @@ export default function Home() {
   const inputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
   const isDocumentLoading = documentLoadingState !== 'idle'
+  const [selectedChat, setSelectedChat] = useState("chat_1")
+
+  useEffect(() => {
+    fetchChatHistory()
+  }, [selectedChat])
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -193,7 +198,7 @@ export default function Home() {
   const fetchChatHistory = async () => {
     try {
       console.log('💬 Obteniendo historial de chat...')
-      const response = await apiClient.getChatHistory()
+      const response = await apiClient.getChatHistory(selectedChat)
       if (response.ok) {
         const data = await response.json()
         
@@ -247,7 +252,7 @@ export default function Home() {
     setIsLoading(true)
 
     try {
-      const response = await apiClient.chat(input)
+      const response = await apiClient.chat(input, selectedChat)
 
       if (response.ok) {
         const data = await response.json()
@@ -439,7 +444,7 @@ export default function Home() {
 
   const handleExportHistory = async () => {
     try {
-      const response = await apiClient.getChatHistory()
+      const response = await apiClient.getChatHistory(selectedChat)
 
       if (!response.ok) {
         throw new Error("Failed to fetch history")
@@ -492,7 +497,7 @@ export default function Home() {
 
   const handleExportPDF = async () => {
     try {
-      const response = await apiClient.getChatHistory()
+      const response = await apiClient.getChatHistory("single_user_persistent_thread")
 
       if (!response.ok) throw new Error("Failed")
 
@@ -664,6 +669,8 @@ export default function Home() {
               onDeleteDocument={handleDeleteDocument}
               onClose={() => setIsSidebarOpen(false)}
               loadingState={documentLoadingState}
+              selectedChat={selectedChat}
+              onChatChange={setSelectedChat}
             />
           </div>
 
