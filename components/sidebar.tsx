@@ -24,9 +24,19 @@ interface SidebarProps {
   onFileUpload: (file: File) => void
   onDeleteDocument: (fileId: string) => void
   onClose?: () => void
+  selectedChat: string
+  onChatChange: (chatId: string) => void
 }
 
-export function Sidebar({ documents, onFileUpload, onDeleteDocument, onClose, loadingState = 'idle' }: SidebarProps) {
+export function Sidebar({
+  documents,
+  onFileUpload,
+  onDeleteDocument,
+  onClose,
+  loadingState = 'idle',
+  selectedChat,
+  onChatChange
+}: SidebarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -110,6 +120,29 @@ export function Sidebar({ documents, onFileUpload, onDeleteDocument, onClose, lo
             </>
           )}
         </Button>
+      </div>
+        <div className="px-4 pb-4">
+        <div className="mb-2 text-xs font-semibold text-muted-foreground">
+          Chats
+        </div>
+
+        <div className="flex gap-2">
+          <Button
+            variant={selectedChat === "chat_1" ? "default" : "outline"}
+            className="flex-1"
+            onClick={() => onChatChange("chat_1")}
+          >
+            Chat 1
+          </Button>
+
+          <Button
+            variant={selectedChat === "chat_2" ? "default" : "outline"}
+            className="flex-1"
+            onClick={() => onChatChange("chat_2")}
+          >
+            Chat 2
+          </Button>
+        </div>
       </div>
 
       {/* Documents List */}
