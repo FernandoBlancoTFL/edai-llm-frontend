@@ -21,21 +21,49 @@ interface Document {
 
 interface SidebarProps {
   documents: Document[]
+  chats: Chat[]
+
   onFileUpload: (file: File) => void
-  onDeleteDocument: (fileId: string) => void
+
+  onDeleteDocument: (
+    fileId: string
+  ) => void
+
   onClose?: () => void
+
+  loadingState?: 'idle' | 'uploading' | 'deleting' | 'fetching'
+
   selectedChat: string
-  onChatChange: (chatId: string) => void
+
+  onChatChange: (
+    chatId: string
+  ) => void
+
+  onCreateChat: () => void
+
+  onDeleteChat: (
+    chatId: string
+  ) => void
+}
+
+interface Chat {
+  id: string
+  name: string
+  created_at: string
+  updated_at: string
 }
 
 export function Sidebar({
   documents,
+  chats,
   onFileUpload,
   onDeleteDocument,
   onClose,
   loadingState = 'idle',
   selectedChat,
-  onChatChange
+  onChatChange,
+  onCreateChat,
+  onDeleteChat
 }: SidebarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null)
@@ -122,27 +150,63 @@ export function Sidebar({
         </Button>
       </div>
         <div className="px-4 pb-4">
-        <div className="mb-2 text-xs font-semibold text-muted-foreground">
-          Chats
-        </div>
 
-        <div className="flex gap-2">
-          <Button
-            variant={selectedChat === "chat_1" ? "default" : "outline"}
-            className="flex-1"
-            onClick={() => onChatChange("chat_1")}
-          >
-            Chat 1
-          </Button>
+          <div className="flex items-center justify-between mb-2">
 
-          <Button
-            variant={selectedChat === "chat_2" ? "default" : "outline"}
-            className="flex-1"
-            onClick={() => onChatChange("chat_2")}
-          >
-            Chat 2
-          </Button>
-        </div>
+            <span className="text-xs font-semibold text-muted-foreground">
+              Chats
+            </span>
+
+            <Button
+              size="sm"
+              onClick={onCreateChat}
+            >
+              +
+            </Button>
+
+          </div>
+
+          <div className="space-y-2">
+
+            {chats.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                No hay chats creados
+              </p>
+            )}
+
+            {chats.map(chat => (
+
+              <div
+                key={chat.id}
+                className="flex gap-2"
+              >
+
+                <Button
+                  variant={
+                    selectedChat === chat.id
+                      ? "default"
+                      : "outline"
+                  }
+                  className="flex-1 justify-start"
+                  onClick={() =>
+                    onChatChange(chat.id)
+                  }
+                >
+                  {chat.name}
+                </Button>
+
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() =>
+                    onDeleteChat(chat.id)
+                  }
+                >
+                  ✕
+                </Button>
+              </div>
+            ))}
+          </div>
       </div>
 
       {/* Documents List */}

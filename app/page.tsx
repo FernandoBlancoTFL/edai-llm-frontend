@@ -38,6 +38,13 @@ interface Document {
   created_at: string
 }
 
+interface Chat {
+  id: string
+  name: string
+  created_at: string
+  updated_at: string
+}
+
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
@@ -53,7 +60,8 @@ export default function Home() {
   const inputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
   const isDocumentLoading = documentLoadingState !== 'idle'
-  const [selectedChat, setSelectedChat] = useState("chat_1")
+  const [chats, setChats] = useState<Chat[]>([])
+  const [selectedChat, setSelectedChat] = useState("")
 
   useEffect(() => {
     fetchChatHistory()
@@ -143,7 +151,7 @@ export default function Home() {
     console.log('📊 Cargando documentos...')
     await fetchDocuments()
     console.log('💬 Cargando historial de chat...')
-    await fetchChatHistory()
+    await fetchChats()
     console.log('✅ Carga completa')
   }
 
@@ -589,6 +597,119 @@ export default function Home() {
     })
   }
 
+  const fetchChats = async () => {
+    try {
+
+      const response =
+        await apiClient.getChats()
+
+      if (!response.ok) {
+        throw new Error(
+          "Error obteniendo chats"
+        )
+      }
+
+      const data =
+        await response.json()
+
+      setChats(data)
+
+      if (data.length > 0) {
+        setSelectedChat(data[0].id)
+      }
+
+    } catch (error) {
+
+      console.error(
+        "Error obteniendo chats:",
+        error
+      )
+
+    }
+  }
+
+  const handleCreateChat = async () => {
+    try {
+
+      const response =
+        await apiClient.createChat(
+          "Nuevo chat"
+        )
+
+      if (!response.ok) {
+        throw new Error(
+          "Error creando chat"
+        )
+      }
+
+      const chat =
+        await response.json()
+
+      setChats(prev => [
+        chat,
+        ...prev
+      ])
+
+      setSelectedChat(chat.id)
+
+      setMessages([])
+
+    } catch (error) {
+
+      console.error(
+        "Error creando chat:",
+        error
+      )
+
+    }
+  }
+
+  const handleDeleteChat = async (
+    chatId: string
+  ) => {
+
+    try {
+
+      const response =
+        await apiClient.deleteChat(
+          chatId
+        )
+
+      if (!response.ok) {
+        throw new Error(
+          "Error eliminando chat"
+        )
+      }
+
+      const updatedChats =
+        chats.filter(
+          chat => chat.id !== chatId
+        )
+
+      setChats(updatedChats)
+
+      if (
+        selectedChat === chatId
+      ) {
+
+        setMessages([])
+
+        setSelectedChat(
+          updatedChats[0]?.id ?? ""
+        )
+
+      }
+
+    } catch (error) {
+
+      console.error(
+        "Error eliminando chat:",
+        error
+      )
+
+    }
+  }
+
   return (
     <div className="flex min-h-screen bg-background">
       {/* Server Warming Overlay - Bloquea toda la aplicación */}
@@ -665,12 +786,15 @@ export default function Home() {
           >
             <Sidebar
               documents={documents}
+              chats={chats}
               onFileUpload={handleFileUpload}
               onDeleteDocument={handleDeleteDocument}
               onClose={() => setIsSidebarOpen(false)}
               loadingState={documentLoadingState}
               selectedChat={selectedChat}
               onChatChange={setSelectedChat}
+              onCreateChat={handleCreateChat}
+              onDeleteChat={handleDeleteChat}
             />
           </div>
 
