@@ -41,8 +41,9 @@ interface SidebarProps {
 
   onCreateChat: () => void
 
-  onDeleteChat: (
-    chatId: string
+  handleDeleteChatClick: (
+    chatId: string,
+    chatName: string
   ) => void
 }
 
@@ -63,7 +64,7 @@ export function Sidebar({
   selectedChat,
   onChatChange,
   onCreateChat,
-  onDeleteChat
+  handleDeleteChatClick
 }: SidebarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null)
@@ -200,7 +201,10 @@ export function Sidebar({
                   size="icon"
                   variant="ghost"
                   onClick={() =>
-                    onDeleteChat(chat.id)
+                    handleDeleteChatClick(
+                      chat.id,
+                      chat.name
+                    )
                   }
                   className="cursor-pointer"
                 >
@@ -256,7 +260,7 @@ export function Sidebar({
                       variant="ghost"
                       size="icon"
                       onClick={() => handlePreviewClick(doc.file_id)}
-                      className="h-8 w-8 shrink-0"
+                      className="cursor-pointer h-8 w-8 shrink-0"
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
@@ -265,7 +269,7 @@ export function Sidebar({
                       variant="ghost"
                       size="icon"
                       onClick={() => handleDeleteClick(doc.file_id, doc.filename)}
-                      className="h-8 w-8 shrink-0"
+                      className="cursor-pointer h-8 w-8 shrink-0"
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
