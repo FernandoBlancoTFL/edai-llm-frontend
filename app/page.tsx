@@ -15,6 +15,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { apiClient } from "@/lib/api"
 import { ChatSuggestions } from "@/components/chat-suggestions"
 import { jsPDF } from "jspdf"
+import Swal from "sweetalert2"
 
 interface Message {
   id: string
@@ -719,6 +720,29 @@ export default function Home() {
     }
   }
 
+  const handleDeleteChatClick = async (
+    chatId: string,
+    chatName: string
+  ) => {
+
+    const result = await Swal.fire({
+      title: "¿Estás seguro?",
+      text: `¿Deseas eliminar el chat "${chatName}"?`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#6b7280",
+      confirmButtonText: "Sí, eliminar",
+      cancelButtonText: "Cancelar",
+      reverseButtons: true
+    })
+
+    if (result.isConfirmed) {
+      await handleDeleteChat(chatId)
+    }
+
+  }
+
   return (
     <div className="flex min-h-screen bg-background">
       {/* Server Warming Overlay - Bloquea toda la aplicación */}
@@ -803,7 +827,7 @@ export default function Home() {
               selectedChat={selectedChat}
               onChatChange={setSelectedChat}
               onCreateChat={handleCreateChat}
-              onDeleteChat={handleDeleteChat}
+              handleDeleteChatClick={handleDeleteChatClick}
             />
           </div>
 
