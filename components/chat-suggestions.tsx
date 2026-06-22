@@ -6,7 +6,7 @@ export function ChatSuggestions({ onSelectSuggestion }: ChatSuggestionsProps) {
   const suggestions = [
     "Hola",
     "Ayuda",
-    "¿Cuántas filas tiene el dataset de cocodrlos?",
+    "¿Cuántas filas tiene el dataset de cocodrilos?",
     "Mostrá un resumen estadístico del primer dataset",
     "¿Qué columnas tiene el dataset de cocodrilo?"
   ]

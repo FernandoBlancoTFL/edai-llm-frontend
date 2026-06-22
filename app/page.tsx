@@ -64,6 +64,9 @@ export default function Home() {
   const [selectedChat, setSelectedChat] = useState("")
 
   useEffect(() => {
+    if (!selectedChat?.trim()) {
+      return
+    }
     fetchChatHistory()
   }, [selectedChat])
 
@@ -204,6 +207,12 @@ export default function Home() {
   }
 
   const fetchChatHistory = async () => {
+    
+    if (!selectedChat?.trim()) {
+      setMessages([])
+      return
+    }
+
     try {
       console.log('💬 Obteniendo historial de chat...')
       const response = await apiClient.getChatHistory(selectedChat)
