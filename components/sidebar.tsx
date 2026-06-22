@@ -158,6 +158,7 @@ export function Sidebar({
             </span>
 
             <Button
+              className="cursor-pointer"
               size="sm"
               onClick={onCreateChat}
             >
@@ -187,7 +188,7 @@ export function Sidebar({
                       ? "default"
                       : "outline"
                   }
-                  className="flex-1 justify-start"
+                  className="flex-1 justify-start cursor-pointer"
                   onClick={() =>
                     onChatChange(chat.id)
                   }
@@ -201,6 +202,7 @@ export function Sidebar({
                   onClick={() =>
                     onDeleteChat(chat.id)
                   }
+                  className="cursor-pointer"
                 >
                   ✕
                 </Button>
