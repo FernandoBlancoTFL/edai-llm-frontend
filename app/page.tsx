@@ -780,12 +780,6 @@ export default function Home() {
                     </p>
                   </div>
                 )}
-                
-                {serverWarmupAttempts <= 1 && (
-                  <p className="text-xs text-muted-foreground/70">
-                    No va a poder visualizar los gráficos cargados. Lo invito a generar uno nuevo.
-                  </p>
-                )}
               </div>
 
               {/* Barra de progreso animada */}
